@@ -84,8 +84,8 @@ def init_queue(
     :param port: The port to connect to.
     :param user: The user to connect as.
     :param password: The password to connect with.
-    :param schema: The schema to create the table in.
-    :param table_name: The name of the table to create.
+    :param db_schema: The schema to create the table in.
+    :param db_table_name: The name of the table to create.
     :return: The Queue model.
     """
 
