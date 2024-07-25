@@ -1,6 +1,9 @@
 from playhouse.postgres_ext import BinaryJSONField
 from datetime import datetime
+from logging import getLogger
 import peewee
+
+logger = getLogger(__name__)
 
 
 class EventQueue(peewee.Model):
@@ -42,6 +45,20 @@ class EventQueue(peewee.Model):
             return event
         except cls.DoesNotExist:
             raise ExceptionQueueEmpty()
+
+    @classmethod
+    def consume(cls, event : str, frequency : float = 1.0):
+        while True:
+            try:
+                payload = cls.pop(event)
+                yield payload
+            except ExceptionQueueEmpty:
+                pass
+            time.sleep(frequency)
+
+    def produce(self, generator):
+        for event, payload in generator:
+            cls.push(event, payload)
 
 
 class ExceptionQueueEmpty(Exception):

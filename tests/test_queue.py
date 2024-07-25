@@ -21,3 +21,11 @@ def test_queue_pop(queue):
     except Exception as e:
         assert False, e
 
+
+def test_consume_push(queue):
+    event = "test_event"
+    payload = {"test": "payload"}
+
+    queue.push(event, payload)
+
+    assert next(queue.consume(event)).payload == payload
