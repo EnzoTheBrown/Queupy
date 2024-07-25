@@ -1,0 +1,13 @@
+version: '3.3'
+
+services:
+  postgres:
+    image: postgres:13
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: queupy
+      POSTGRES_PASSWORD: queupy
+      POSTGRES_DB: queupy
+    restart: always
+
