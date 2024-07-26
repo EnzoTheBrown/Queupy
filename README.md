@@ -33,7 +33,7 @@ from queupy import init_queue
  )
 
  for event in event_queue.consume('test', frequency=0.01):
-     logger.info(f"Consuming event {event}")
+     print(f"Consuming event {event}")
 
 ```
 
