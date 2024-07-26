@@ -1,8 +1,7 @@
-from playhouse.postgres_ext import BinaryJSONField
-from datetime import datetime
-import peewee
 import uuid
 import time
+import json
+from datetime import datetime
 
 
 class ExceptionQueueEmpty(Exception):
@@ -19,14 +18,7 @@ class ExceptionQueueColision(Exception):
     pass
 
 
-LOCK_TEMPLATE = """
-BEGIN WORK;
-LOCK TABLE {table_name};
-{query};
-COMMIT WORK;
-"""
-
-class EventQueue(peewee.Model):
+class EventQueue:
     """
     A model for a queue table in a database.
 
@@ -37,56 +29,44 @@ class EventQueue(peewee.Model):
     :param updated_at: The time the event was last updated.
 
     """
-    event = peewee.CharField()
-    state = peewee.IntegerField()
-    payload = BinaryJSONField()
-    created_at = peewee.DateTimeField(default=datetime.now)
-    updated_at = peewee.DateTimeField(default=datetime.now)
-    transaction_id = peewee.UUIDField(null=True)
+    def __init__(self, conn):
+        self.conn = conn
 
-    @classmethod
-    def push(cls, event, payload):
-        event = cls.create(
-            event=event,
-            payload=payload,
-            state=0,
-            created_at=datetime.now()
-        )
-        return event
+    def push(self, event, payload):
+        payload_json = json.dumps(payload)
+        cur = self.conn.cursor()
+        cur.execute(f"""
+            INSERT INTO "{self.schema}"."{self.table_name}" (event, payload)
+            VALUES (%s, %s::jsonb);
+        """, (event, payload_json,))
+        self.conn.commit()
+        cur.close()
 
-    @classmethod
-    def execute_lock(cls, query):
-        query = query.sql()
-        lock_query_string = LOCK_TEMPLATE.format(
-            table_name=cls._meta.table_name,
-            query=query[0]
-        )
-        cls._meta.database.execute_sql(lock_query_string, query[1])
-
-    @classmethod
-    def pop(cls, event, priority):
-        try:
-            transaction_id = uuid.uuid4()
-            query = cls.update({
-                        cls.transaction_id: transaction_id,
-                        cls.updated_at: datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        cls.state: 1
-                }).where(
-                    (cls.event == event) &
-                    (cls.state == 0) &
-                    priority()
-            )
-            cls.execute_lock(query)
-            event_queue = cls.get(cls.transaction_id == transaction_id)
-            return event_queue
-        except cls.DoesNotExist:
+    def pop(self, event_name, priority):
+        transaction_id = uuid.uuid4()
+        cur = self.conn.cursor()
+        cur.execute("BEGIN WORK;")
+        cur.execute(f"LOCK TABLE {self.table_name};")
+        cur.execute(f"""UPDATE {self.table_name}
+        SET transaction_id = %s, updated_at = %s, state = 1
+        WHERE event = %s AND state = 0 AND {priority(event_name)};
+        """, (str(transaction_id), datetime.now(), event_name,))
+        cur.execute(f'COMMIT WORK;')
+        self.conn.commit()
+        cur.execute(f"""
+            SELECT payload FROM {self.table_name} WHERE transaction_id = %s;
+        """, (str(transaction_id),))
+        self.conn.commit()
+        result = cur.fetchone()
+        if not result:
             raise ExceptionQueueEmpty()
+        cur.close()
+        return result[0]
 
-    @classmethod
-    def consume(cls, event : str, frequency : float = 1.0):
+    def consume(self, event: str, frequency: float = 1.0):
         while True:
             try:
-                payload = cls.pop(event)
+                payload = self.pop(event)
                 yield payload
             except ExceptionQueueEmpty:
                 pass
@@ -94,5 +74,5 @@ class EventQueue(peewee.Model):
 
     def produce(self, generator):
         for event, payload in generator:
-            cls.push(event, payload)
+            self.push(event, payload)
 

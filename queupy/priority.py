@@ -1,4 +1,3 @@
-from peewee import fn
 from abc import ABC, abstractmethod
 
 
@@ -11,7 +10,8 @@ class PriorityEventQueue(ABC):
     def __init__(self, model):
         self.model = model
 
-    def __call__(self):
+    @abstractmethod
+    def __call__(self, event):
         pass
 
 
@@ -19,24 +19,24 @@ class FIFOEventQueue(PriorityEventQueue):
     """
     A model for a FIFO queue table in a database.
     """
-    def __call__(self):
-        return self.model.created_at <= (
-            self.model.select(fn.MIN(self.model.created_at)).where(
-                (self.model.event == self.model.event) &
-                (self.model.state == 0)
-            )
-        )
+    def __call__(self, event):
+        min_created_at = f"""(
+            {self.model.table_name}.created_at <= (SELECT MIN(created_at)
+            FROM {self.model.table_name}
+            WHERE event = '{event}' AND state = 0))
+        """
+        return min_created_at
 
 
 class LIFOEventQueue(PriorityEventQueue):
     """
     A model for a LIFO queue table in a database.
     """
-    def __call__(self):
-        return self.model.created_at >= (
-            self.model.select(fn.MAX(self.model.created_at)).where(
-                (self.model.event == self.model.event) &
-                (self.model.state == 0)
-            )
-        )
+    def __call__(self, event):
+        min_created_at = f"""(
+            {self.model.table_name}.created_at >= (SELECT MAX(created_at)
+            FROM {self.model.table_name}
+            WHERE event = '{event}' AND state = 0))
+        """
+        return min_created_at
 

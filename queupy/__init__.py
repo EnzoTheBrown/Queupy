@@ -1,2 +1,2 @@
 from .queue import init_queue
-from .model import ExceptionQueueEmpty
+from .priority import FIFOEventQueue, LIFOEventQueue

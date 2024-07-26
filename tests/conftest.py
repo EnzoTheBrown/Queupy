@@ -1,15 +1,19 @@
+from queupy import init_queue
 import pytest
-from queupy import init_queue, ExceptionQueueEmpty
 
 
 @pytest.fixture()
-def queue():
-    queue = init_queue(
+def event_queue():
+    event_queue = init_queue(
         database_name='queupy',
+        host='localhost',
         user='queupy',
         password='queupy',
-        host='localhost',
     )
-    yield queue
-    queue.drop_table()
+    yield event_queue
 
+    cur = event_queue.conn.cursor()
+    cur.execute(f"DROP TABLE {event_queue.table_name}")
+    event_queue.conn.commit()
+    cur.close()
+    event_queue.conn.close()

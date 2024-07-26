@@ -1,17 +1,17 @@
 from .model import EventQueue
 from .priority import FIFOEventQueue, LIFOEventQueue
-import peewee
 
+import psycopg2
 
 def init_queue(
-        database_name : str,
-        host : str,
-        user : str,
-        password : str,
-        port : int = 5432,
-        db_schema : str = 'public',
-        db_table_name : str = '_queupy_event_queue',
-        priority : peewee.Expression = FIFOEventQueue):
+        database_name: str,
+        host: str,
+        user: str,
+        password: str,
+        port: int = 5432,
+        db_schema: str = 'public',
+        db_table_name: str = '_queupy_event',
+        priority=FIFOEventQueue):
     """
     Initialize a queue table in the database.
 
@@ -24,27 +24,33 @@ def init_queue(
     :param db_table_name: The name of the table to create.
     :return: The Queue model.
     """
-
-    db = peewee.PostgresqlDatabase(
-        database_name,
+    conn = psycopg2.connect(
+        dbname=database_name,
         host=host,
-        port=port,
         user=user,
-        password=password
+        password=password,
+        port=port
     )
 
     class _EventQueue(EventQueue):
-        class Meta:
-            database = db
-            schema = db_schema
-            table_name = db_table_name
+        table_name = db_table_name
+        schema = db_schema
 
-        @classmethod
         def pop(cls, event):
             return super().pop(event, priority(cls))
 
-    if not db.table_exists(_EventQueue):
-        db.create_tables([_EventQueue])
+    cur = conn.cursor()
+    cur.execute(f"""
+        CREATE TABLE IF NOT EXISTS "{db_schema}"."{db_table_name}" (
+            id SERIAL PRIMARY KEY,
+            event TEXT NOT NULL,
+            state INTEGER NOT NULL DEFAULT 0,
+            payload JSONB NOT NULL,
+            transaction_id UUID,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        );
+    """)
 
-    return _EventQueue
+    return _EventQueue(conn)
 
