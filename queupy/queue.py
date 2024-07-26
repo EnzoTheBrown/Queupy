@@ -1,7 +1,9 @@
 from .model import EventQueue
 from .priority import FIFOEventQueue, LIFOEventQueue
-
+from queupy.utils import getLogger
 import psycopg2
+
+logger = getLogger(__name__)
 
 def init_queue(
         database_name: str,
