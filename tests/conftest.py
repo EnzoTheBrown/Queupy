@@ -9,7 +9,6 @@ def queue():
         user='queupy',
         password='queupy',
         host='localhost',
-        port=5432,
     )
     yield queue
     queue.drop_table()

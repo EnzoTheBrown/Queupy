@@ -1,1 +1,2 @@
-from .database import init_queue, ExceptionQueueEmpty
+from .queue import init_queue
+from .model import ExceptionQueueEmpty
