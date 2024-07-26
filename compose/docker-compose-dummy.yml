@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:13
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: queupy
+      POSTGRES_PASSWORD: queupy
+      POSTGRES_DB: queupy
+    restart: always
+
+  consumer:
+    image: queupy
+    command: ["python", "examples/consumer.py"]
+    depends_on:
+      - postgres
+
+  producer:
+    image: queupy
+    command: ["python", "examples/producer.py"]
+    depends_on:
+      - postgres

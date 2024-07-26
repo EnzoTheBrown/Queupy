@@ -13,7 +13,8 @@ def init_queue(
         port: int = 5432,
         db_schema: str = 'public',
         db_table_name: str = '_queupy_event',
-        priority=FIFOEventQueue):
+        priority=FIFOEventQueue,
+        callback : callable = None):
     """
     Initialize a queue table in the database.
 
@@ -54,5 +55,5 @@ def init_queue(
         );
     """)
 
-    return _EventQueue(conn)
+    return _EventQueue(conn, callback=callback)
 

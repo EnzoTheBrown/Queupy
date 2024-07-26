@@ -29,8 +29,9 @@ class EventQueue:
     :param updated_at: The time the event was last updated.
 
     """
-    def __init__(self, conn):
+    def __init__(self, conn, callback=None):
         self.conn = conn
+        self.callback = callback
 
     def push(self, event, payload):
         payload_json = json.dumps(payload)
@@ -39,6 +40,8 @@ class EventQueue:
             INSERT INTO "{self.schema}"."{self.table_name}" (event, payload)
             VALUES (%s, %s::jsonb);
         """, (event, payload_json,))
+        if self.callback:
+            self.callback('push', event)
         self.conn.commit()
         cur.close()
 
@@ -58,6 +61,8 @@ class EventQueue:
         """, (str(transaction_id),))
         self.conn.commit()
         result = cur.fetchone()
+        if self.callback:
+            self.callback('pop', event_name)
         if not result:
             raise ExceptionQueueEmpty()
         cur.close()
