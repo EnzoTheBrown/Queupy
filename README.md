@@ -78,6 +78,9 @@ Queupy will automatically create the `_queupy_event` table in your specified dat
 | 2    | test  | 1     | {"i": 1}  | 8000142a-42b9-4656-8518-81e3ee6bd20b  | 2024-07-26 14:06:22.596648| 2024-07-26 16:15:56.322857|
 | 3    | test  | 1     | {"i": 2}  | a6e8b353-c53d-48fb-b8b0-5a972648b384  | 2024-07-26 14:06:22.598692| 2024-07-26 16:15:57.381679|
 
+
+Not consumed events have a `state` of `0`, while consumed events have a `state` of `1`. The `transaction_id` is used to ensure that events are consumed only once.
+
 ## Contributing
 
 Contributions are welcome! Please fork the repository and submit a pull request with your improvements.
