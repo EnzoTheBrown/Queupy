@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 
 
-class PriorityEventQueue(ABC):
+class PolicyEventQueue(ABC):
     """
-    A model for a priority queue table in a database.
+    A model for a policy queue table in a database.
 
-    :param priority: The priority of the event.
+    :param policy: The policy of the event.
     """
     def __init__(self, model):
         self.model = model
@@ -15,7 +15,7 @@ class PriorityEventQueue(ABC):
         pass
 
 
-class FIFOEventQueue(PriorityEventQueue):
+class FIFOEventQueue(PolicyEventQueue):
     """
     A model for a FIFO queue table in a database.
     """
@@ -28,7 +28,7 @@ class FIFOEventQueue(PriorityEventQueue):
         return min_created_at
 
 
-class LIFOEventQueue(PriorityEventQueue):
+class LIFOEventQueue(PolicyEventQueue):
     """
     A model for a LIFO queue table in a database.
     """
