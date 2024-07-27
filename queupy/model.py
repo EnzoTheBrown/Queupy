@@ -18,6 +18,24 @@ class ExceptionQueueColision(Exception):
     pass
 
 
+class PostgresMutex:
+    def __init__(self, conn, cur, table_name, schema='public'):
+        self.conn = conn
+        self.cur = cur
+        self.table_name = table_name
+        self.schema = schema
+
+    def __enter__(self):
+        self.cur.execute('BEGIN WORK;')
+        self.cur.execute(f'LOCK TABLE {self.schema}."{self.table_name}";')
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.cur.execute('COMMIT WORK;')
+        self.conn.commit()
+
+
 class EventQueue:
     """
     A model for a queue table in a database.
@@ -35,37 +53,36 @@ class EventQueue:
 
     def push(self, event, payload):
         payload_json = json.dumps(payload)
-        cur = self.conn.cursor()
-        cur.execute(f"""
-            INSERT INTO "{self.schema}"."{self.table_name}" (event, payload)
-            VALUES (%s, %s::jsonb);
-        """, (event, payload_json,))
-        if self.callback:
-            self.callback('push', event)
-        self.conn.commit()
-        cur.close()
+        with self.conn.cursor() as cur:
+            cur.execute(f"""
+                INSERT INTO "{self.schema}"."{self.table_name}" (event, payload)
+                VALUES (%s, %s::jsonb);
+            """, (event, payload_json,))
+            if self.callback:
+                self.callback('push', event)
+            self.conn.commit()
 
     def pop(self, event_name, priority):
         transaction_id = uuid.uuid4()
-        cur = self.conn.cursor()
-        cur.execute("BEGIN WORK;")
-        cur.execute(f"LOCK TABLE {self.table_name};")
-        cur.execute(f"""UPDATE {self.table_name}
-        SET transaction_id = %s, updated_at = %s, state = 1
-        WHERE event = %s AND state = 0 AND {priority(event_name)};
-        """, (str(transaction_id), datetime.now(), event_name,))
-        cur.execute(f'COMMIT WORK;')
-        self.conn.commit()
-        cur.execute(f"""
-            SELECT payload FROM {self.table_name} WHERE transaction_id = %s;
-        """, (str(transaction_id),))
-        self.conn.commit()
-        result = cur.fetchone()
+        with self.conn.cursor() as cur:
+            with PostgresMutex(self.conn, cur, self.table_name) as mut:
+                cur.execute(
+                    f"""UPDATE {self.table_name}
+                    SET transaction_id = %s, updated_at = %s, state = 1
+                    WHERE event = %s AND state = 0 AND {priority(event_name)};
+                    """, (str(transaction_id), datetime.now(), event_name,)
+                )
+            self.conn.commit()
+            cur.execute(f"""
+                SELECT payload FROM {self.table_name} WHERE transaction_id = %s;
+            """, (str(transaction_id),))
+            self.conn.commit()
+            result = cur.fetchone()
+
         if self.callback:
             self.callback('pop', event_name)
         if not result:
             raise ExceptionQueueEmpty()
-        cur.close()
         return result[0]
 
     def consume(self, event: str, frequency: float = 1.0):
