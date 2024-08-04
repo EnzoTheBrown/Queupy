@@ -99,12 +99,21 @@ class EventQueue:
             """, (str(transaction_id),))
             cls.conn.commit()
             result = cur.fetchone()
-
         if cls.callback:
             cls.callback('pop', event_name)
         if not result:
             raise ExceptionQueueEmpty()
         return result[0]
+
+    @classmethod
+    def select(cls) -> list:
+        with cls.conn.cursor() as cur:
+            cur.execute(f"""
+                SELECT id, event, state, payload, transaction_id, created_at, updated_at
+                FROM {cls.table_name};
+            """)
+            result = cur.fetchall()
+        return result
 
     def consume(cls, event: str, frequency: float = 1.0):
         while True:
