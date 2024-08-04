@@ -110,10 +110,25 @@ class EventQueue:
         with cls.conn.cursor() as cur:
             cur.execute(f"""
                 SELECT id, event, state, payload, transaction_id, created_at, updated_at
-                FROM {cls.table_name};
+                FROM {cls.table_name}
+                ORDER BY created_at DESC;
             """)
             result = cur.fetchall()
-        return result
+            events = []
+
+            for row in result:
+                event = {
+                    'id': row[0],
+                    'event': row[1],
+                    'state': row[2],
+                    'payload': row[3],
+                    'transaction_id': row[4],
+                    'created_at': row[5],
+                    'updated_at': row[6]
+                }
+                events.append(event)
+
+        return events
 
     def consume(cls, event: str, frequency: float = 1.0):
         while True:
