@@ -2,6 +2,8 @@ import uuid
 import time
 import json
 from datetime import datetime
+from .policy import PolicyEventQueue, FIFOEventQueue
+import pickle
 
 
 class ExceptionQueueEmpty(Exception):
@@ -18,6 +20,24 @@ class ExceptionQueueColision(Exception):
     pass
 
 
+class PostgresMutex:
+    def __init__(self, conn, cur, table_name, schema='public'):
+        self.conn = conn
+        self.cur = cur
+        self.table_name = table_name
+        self.schema = schema
+
+    def __enter__(self):
+        self.cur.execute('BEGIN WORK;')
+        self.cur.execute(f'LOCK TABLE {self.schema}."{self.table_name}";')
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.cur.execute('COMMIT WORK;')
+        self.conn.commit()
+
+
 class EventQueue:
     """
     A model for a queue table in a database.
@@ -29,55 +49,112 @@ class EventQueue:
     :param updated_at: The time the event was last updated.
 
     """
-    def __init__(self, conn, callback=None):
-        self.conn = conn
-        self.callback = callback
 
-    def push(self, event, payload):
+    table_name = '_queupy_event'
+    schema = 'public'
+    conn = None
+    callback = None
+
+    @classmethod
+    def create_table(cls):
+        with cls.conn.cursor() as cur:
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS "{cls.schema}"."{cls.table_name}" (
+                    id SERIAL PRIMARY KEY,
+                    event TEXT NOT NULL,
+                    state INTEGER NOT NULL DEFAULT 0,
+                    payload JSONB NOT NULL,
+                    transaction_id UUID,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                );
+            """)
+
+    @classmethod
+    def push(cls, event : str, payload : dict | list) -> None:
         payload_json = json.dumps(payload)
-        cur = self.conn.cursor()
-        cur.execute(f"""
-            INSERT INTO "{self.schema}"."{self.table_name}" (event, payload)
-            VALUES (%s, %s::jsonb);
-        """, (event, payload_json,))
-        if self.callback:
-            self.callback('push', event)
-        self.conn.commit()
-        cur.close()
+        with cls.conn.cursor() as cur:
+            cur.execute(f"""
+                INSERT INTO "{cls.schema}"."{cls.table_name}" (event, payload)
+                VALUES (%s, %s::jsonb);
+            """, (event, payload_json,))
+            if cls.callback:
+                cls.callback('push', event)
+            cls.conn.commit()
 
-    def pop(self, event_name, priority):
+    @classmethod
+    def pop(cls, event_name : str, policy : PolicyEventQueue = FIFOEventQueue) -> dict | list:
         transaction_id = uuid.uuid4()
-        cur = self.conn.cursor()
-        cur.execute("BEGIN WORK;")
-        cur.execute(f"LOCK TABLE {self.table_name};")
-        cur.execute(f"""UPDATE {self.table_name}
-        SET transaction_id = %s, updated_at = %s, state = 1
-        WHERE event = %s AND state = 0 AND {priority(event_name)};
-        """, (str(transaction_id), datetime.now(), event_name,))
-        cur.execute(f'COMMIT WORK;')
-        self.conn.commit()
-        cur.execute(f"""
-            SELECT payload FROM {self.table_name} WHERE transaction_id = %s;
-        """, (str(transaction_id),))
-        self.conn.commit()
-        result = cur.fetchone()
-        if self.callback:
-            self.callback('pop', event_name)
+        with cls.conn.cursor() as cur:
+            with PostgresMutex(cls.conn, cur, cls.table_name) as mut:
+                cur.execute(
+                    f"""UPDATE {cls.table_name}
+                    SET transaction_id = %s, updated_at = %s, state = 1
+                    WHERE event = %s AND state = 0 AND {policy(event_name)};
+                    """, (str(transaction_id), datetime.now(), event_name,)
+                )
+            cls.conn.commit()
+            cur.execute(f"""
+                SELECT payload FROM {cls.table_name} WHERE transaction_id = %s;
+            """, (str(transaction_id),))
+            cls.conn.commit()
+            result = cur.fetchone()
+        if cls.callback:
+            cls.callback('pop', event_name)
         if not result:
             raise ExceptionQueueEmpty()
-        cur.close()
         return result[0]
 
-    def consume(self, event: str, frequency: float = 1.0):
+    @classmethod
+    def flush(cls, event_name : str = None) -> None:
+        with cls.conn.cursor() as cur:
+            if not event_name:
+                cur.execute(f"""
+                    DELETE FROM {cls.table_name};
+                """)
+            else:
+                cur.execute(f"""
+                    DELETE FROM {cls.table_name} WHERE event = %s;
+                """, (event_name,))
+        cls.conn.commit()
+
+    @classmethod
+    def select(cls) -> list:
+        with cls.conn.cursor() as cur:
+            cur.execute(f"""
+                SELECT id, event, state, payload, transaction_id, created_at, updated_at
+                FROM {cls.table_name}
+                ORDER BY created_at DESC;
+            """)
+            result = cur.fetchall()
+            events = []
+
+            for row in result:
+                event = {
+                    'id': row[0],
+                    'event': row[1],
+                    'state': row[2],
+                    'payload': row[3],
+                    'transaction_id': row[4],
+                    'created_at': row[5],
+                    'updated_at': row[6]
+                }
+                events.append(event)
+
+        return events
+
+    @classmethod
+    def consume(cls, event: str, frequency: float = 1.0):
         while True:
             try:
-                payload = self.pop(event)
+                payload = cls.pop(event)
                 yield payload
             except ExceptionQueueEmpty:
                 pass
             time.sleep(frequency)
 
-    def produce(self, generator):
+    @classmethod
+    def produce(cls, generator):
         for event, payload in generator:
-            self.push(event, payload)
+            cls.push(event, payload)
 

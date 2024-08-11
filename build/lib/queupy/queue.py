@@ -1,9 +1,10 @@
 from .model import EventQueue
-from .priority import FIFOEventQueue, LIFOEventQueue
+from .policy import FIFOEventQueue, LIFOEventQueue
 from queupy.utils import getLogger
 import psycopg2
 
 logger = getLogger(__name__)
+
 
 def init_queue(
         database_name: str,
@@ -13,7 +14,7 @@ def init_queue(
         port: int = 5432,
         db_schema: str = 'public',
         db_table_name: str = '_queupy_event',
-        priority=FIFOEventQueue,
+        policy=FIFOEventQueue,
         callback : callable = None):
     """
     Initialize a queue table in the database.
@@ -34,26 +35,20 @@ def init_queue(
         password=password,
         port=port
     )
+    _callback = callback
+    _conn = conn
 
     class _EventQueue(EventQueue):
         table_name = db_table_name
         schema = db_schema
+        conn = _conn
+        callback = _callback
 
+        @classmethod
         def pop(cls, event):
-            return super().pop(event, priority(cls))
+            return super().pop(event, policy(cls))
 
-    cur = conn.cursor()
-    cur.execute(f"""
-        CREATE TABLE IF NOT EXISTS "{db_schema}"."{db_table_name}" (
-            id SERIAL PRIMARY KEY,
-            event TEXT NOT NULL,
-            state INTEGER NOT NULL DEFAULT 0,
-            payload JSONB NOT NULL,
-            transaction_id UUID,
-            created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW()
-        );
-    """)
+    _EventQueue.create_table()
 
-    return _EventQueue(conn, callback=callback)
+    return _EventQueue
 

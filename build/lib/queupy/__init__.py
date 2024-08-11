@@ -1,2 +1,2 @@
 from .queue import init_queue
-from .priority import FIFOEventQueue, LIFOEventQueue
+from .policy import FIFOEventQueue, LIFOEventQueue, PolicyEventQueue
