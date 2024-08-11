@@ -60,7 +60,7 @@ jobs:
       - name: Bump version
         id: bump_version
         run: |
-          bump2version patch  # Update 'patch' to 'minor' or 'major' as needed
+          bump2version --new-version patch  # Update 'patch' to 'minor' or 'major' as needed
 
       - name: Build package
         run: |
