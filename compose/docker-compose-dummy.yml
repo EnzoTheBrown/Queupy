@@ -9,14 +9,25 @@ services:
       POSTGRES_DB: queupy
     restart: always
 
-  consumer:
+  consumer1:
     image: queupy
     command: ["python", "examples/consumer.py"]
     depends_on:
       - postgres
+    volumes:
+      - ./logs:/app/logs
+
+  consumer2:
+    image: queupy
+    command: ["python", "examples/consumer.py"]
+    depends_on:
+      - postgres
+    volumes:
+      - ./logs:/app/logs
 
   producer:
     image: queupy
     command: ["python", "examples/producer.py"]
     depends_on:
       - postgres
+

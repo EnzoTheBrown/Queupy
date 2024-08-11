@@ -19,7 +19,6 @@ def main():
     for i in range(1000):
         logger.info(f"Pushing event {i}")
         event_queue.push('test', {'i': i})
-        time.sleep(1)
 
 
 if __name__ == '__main__':
