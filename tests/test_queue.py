@@ -112,3 +112,53 @@ def test_select(event_queue):
     assert events[1]['created_at'] is not None
     assert events[1]['updated_at'] is not None
 
+
+def test_flush(event_queue):
+    event_queue.push("event1", {"key": "value1"})
+    event_queue.push("event1", {"key": "value2"})
+
+    event_queue.flush()
+
+    conn = event_queue.conn
+    cur = conn.cursor()
+    cur.execute(f"SELECT * FROM {event_queue.table_name}")
+    conn.commit()
+    result = cur.fetchall()
+    assert len(result) == 0
+
+def test_flush_event(event_queue):
+    event_queue.push("event1", {"key": "value1"})
+    event_queue.push("event2", {"key": "value2"})
+
+    event_queue.flush("event1")
+
+    conn = event_queue.conn
+    cur = conn.cursor()
+    cur.execute(f"SELECT * FROM {event_queue.table_name}")
+    conn.commit()
+    result = cur.fetchall()
+    assert len(result) == 1
+
+
+def test_lenght(event_queue):
+    assert event_queue.length("event1") == 0
+    assert event_queue.length() == 0
+
+    event_queue.push("event1", {"key": "value1"})
+
+    assert event_queue.length("event1") == 1
+    assert event_queue.length() == 1
+
+    event_queue.push("event1", {"key": "value2"})
+    assert event_queue.length("event1") == 2
+    assert event_queue.length() == 2
+
+    event_queue.pop("event1")
+
+    assert event_queue.length("event1") == 1
+    assert event_queue.length() == 1
+
+    event_queue.push("event2", {"key": "value2"})
+    assert event_queue.length("event2") == 1
+    assert event_queue.length("event1") == 1
+    assert event_queue.length() == 2
