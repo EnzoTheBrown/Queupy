@@ -19,7 +19,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres"
+          --health-cmd="pg_isready -U queupy"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -43,13 +43,13 @@ jobs:
 
       - name: Wait for PostgreSQL to be ready
         run: |
-          while ! pg_isready -h 127.0.0.1 -p 5432 -U postgres; do
+          while ! pg_isready -h 127.0.0.1 -p 5432 -U queupy; do
             sleep 1
           done
 
       - name: Run tests
         env:
-          DB_HOST: 'postgres'
+          DB_HOST: 'localhost'
           DB_USER: 'queupy'
           DB_PASSWORD: 'queupy'
           DB_DATABASE: 'queupy'
