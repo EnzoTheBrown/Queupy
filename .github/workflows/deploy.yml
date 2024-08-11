@@ -13,9 +13,9 @@ jobs:
       postgres:
         image: postgres:13  # Use the desired version of PostgreSQL
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: queupy_test_db
+          POSTGRES_USER: queupy
+          POSTGRES_PASSWORD: queupy
+          POSTGRES_DB: queupy
         ports:
           - 5432:5432
         options: >-
