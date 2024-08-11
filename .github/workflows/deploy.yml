@@ -24,6 +24,7 @@ jobs:
           pip install -r requirements/requirements.txt
           pip install -r requirements/test_requirements.txt
           pip install setuptools wheel twine bump2version
+          pip install -e .
 
       - name: Run tests
         run: |
