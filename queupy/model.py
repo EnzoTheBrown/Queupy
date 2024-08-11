@@ -106,6 +106,19 @@ class EventQueue:
         return result[0]
 
     @classmethod
+    def flush(cls, event_name : str = None) -> None:
+        with cls.conn.cursor() as cur:
+            if not event_name:
+                cur.execute(f"""
+                    DELETE FROM {cls.table_name};
+                """)
+            else:
+                cur.execute(f"""
+                    DELETE FROM {cls.table_name} WHERE event = %s;
+                """, (event_name,))
+        cls.conn.commit()
+
+    @classmethod
     def select(cls) -> list:
         with cls.conn.cursor() as cur:
             cur.execute(f"""
@@ -130,6 +143,7 @@ class EventQueue:
 
         return events
 
+    @classmethod
     def consume(cls, event: str, frequency: float = 1.0):
         while True:
             try:
@@ -139,6 +153,7 @@ class EventQueue:
                 pass
             time.sleep(frequency)
 
+    @classmethod
     def produce(cls, generator):
         for event, payload in generator:
             cls.push(event, payload)
