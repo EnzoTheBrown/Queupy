@@ -9,6 +9,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:13  # Use the desired version of PostgreSQL
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: queupy_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -26,7 +41,19 @@ jobs:
           pip install setuptools wheel twine bump2version
           pip install -e .
 
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          while ! pg_isready -h 127.0.0.1 -p 5432 -U postgres; do
+            sleep 1
+          done
+
       - name: Run tests
+        env:
+          DB_HOST: 'postgres'
+          DB_USER: 'queupy'
+          DB_PASSWORD: 'queupy'
+          DB_DATABASE: 'queupy'
+          DB_PORT: '5432'
         run: |
           pytest tests
 
