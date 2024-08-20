@@ -158,3 +158,16 @@ class EventQueue:
         for event, payload in generator:
             cls.push(event, payload)
 
+    @classmethod
+    def length(cls, event : str = None) -> int:
+        with cls.conn.cursor() as cur:
+            if not event:
+                cur.execute(f"""
+                    SELECT COUNT(*) FROM {cls.table_name} WHERE state = 0;
+                """)
+            else:
+                cur.execute(f"""
+                    SELECT COUNT(*) FROM {cls.table_name} WHERE event = %s and state = 0;
+                """, (event,))
+            result = cur.fetchone()
+        return result[0]

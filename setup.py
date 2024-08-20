@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='queupy',
-    version="0.2.3",
+    version="0.2.5",
     packages=find_packages(),
     install_requires=[
         'peewee>=3.14.0',

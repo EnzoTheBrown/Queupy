@@ -11,8 +11,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:13  # Use the desired version of PostgreSQL
-        env:
+        image: postgres:13   
+      env:
           POSTGRES_USER: queupy
           POSTGRES_PASSWORD: queupy
           POSTGRES_DB: queupy
