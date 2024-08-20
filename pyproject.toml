@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "queupy"
+version = "0.2.5"
+description = ""
+authors = ["Enzo Lebrun <enzo.the@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+psycopg2-binary = "^2.9.9"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
